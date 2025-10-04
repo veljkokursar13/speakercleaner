@@ -1,50 +1,64 @@
-# Welcome to your Expo app 👋
+# 🔊 speakercleaner
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A lightweight mobile utility app that helps **clean your phone’s speakers** by playing special sound frequencies designed to push out **water, dust, or dirt**.  
+Built with **React Native + Expo SDK 54** and the new **expo-audio** API.  
 
-## Get started
+---
 
-1. Install dependencies
+## ✨ Features
 
-   ```bash
-   npm install
-   ```
+- ⚡ **Auto Clean** – one-tap sequence of tones & sweeps  
+- 🎚 **Manual Mode** – choose custom frequency (20 Hz → 15 kHz)  
+- ⏱ **Progress Indicator** – real-time countdown during cleaning  
+- 🛑 **Stop Anytime** – emergency stop button always visible  
+- 🎨 **Minimal UI** – dark theme, modern and simple  
 
-2. Start the app
+---
 
-   ```bash
-   npx expo start
-   ```
+## 🛠 Tech Stack
 
-In the output, you'll find options to open the app in a
+- [React Native](https://reactnative.dev/) (Expo SDK 54)  
+- [TypeScript](https://www.typescriptlang.org/)  
+- [expo-audio](https://docs.expo.dev/versions/latest/sdk/audio/) for audio playback  
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## 🚀 Getting Started
 
-## Get a fresh project
-
-When you're ready, run:
+Clone the repo and install with **pnpm**:
 
 ```bash
-npm run reset-project
-```
+git clone https://github.com/YOUR_USERNAME/speakercleaner.git
+cd speakercleaner
+pnpm install
+pnpm start
+Run on your device with Expo Go or in your emulator.
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+⚠️ Safety Notes
+Use with caution:
 
-## Learn more
+Set volume high (but not maximum)
 
-To learn more about developing your project with Expo, look at the following resources:
+Point phone speaker down
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Remove case or cover
 
-## Join the community
+⚠️ Do not use with headphones or Bluetooth devices connected.
 
-Join our community of developers creating universal apps.
+Results may vary — this app may help expel water/dust, but it is not guaranteed.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+📌 Roadmap
+🔄 Presets (Water, Dust, Sand)
+
+🎛 Custom frequency sweep builder
+
+📊 Cleaning stats/history
+
+🌐 Deploy on Google Play & App Store
+
+👤 Author
+Veljko Kursar
+📍 Building apps & games at √Q (Quantamo Labs)
+🔗 LinkedIn | GitHub
+
+⭐ If this repo helped you, give it a star! 🚀
