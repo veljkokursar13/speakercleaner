@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { Audio } from 'expo-audio';
 
 export async function playToneAsync(frequencyHz: number, durationMs: number) {
   // Placeholder: in production, prefer pre-baked assets for reliability

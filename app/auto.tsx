@@ -1,8 +1,8 @@
-import { View, Text, StyleSheet } from 'react-native';
-import ProgressBar from '@/src/components/ProgressBar';
 import Animation from '@/src/components/Animation';
+import ProgressBar from '@/src/components/ProgressBar';
 import { useCleaner } from '@/src/hooks/useCleaner';
-import Button from '@/src/components/Button';
+import Button from '@/src/ui/components/Button';
+import { StyleSheet, Text, View } from 'react-native';
 
 export default function AutoScreen() {
   const { status, progress, start, stop } = useCleaner();
