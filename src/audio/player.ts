@@ -1,22 +1,18 @@
-import { Audio } from 'expo-audio';
+import { createAudioPlayer } from 'expo-audio';
 
 export async function playToneAsync(frequencyHz: number, durationMs: number) {
-  // Placeholder: in production, prefer pre-baked assets for reliability
-  const sound = new Audio.Sound();
-  try {
-    await sound.loadAsync(require('@/assets/sounds/tone-950.wav'));
-    await sound.playAsync();
-    await new Promise((r) => setTimeout(r, durationMs));
-  } finally {
-    await sound.unloadAsync();
-  }
+  // Placeholder: uses a baked asset instead of synthesizing frequencyHz
+  const player = createAudioPlayer(require('../../assets/sounds/tone-950.wav'));
+  player.play();
+  await new Promise((r) => setTimeout(r, durationMs));
+  player.pause();
+  player.remove();
 }
 
 export async function playAssetAsync(assetModule: number) {
-  const sound = new Audio.Sound();
-  await sound.loadAsync(assetModule);
-  await sound.playAsync();
-  return sound;
+  const player = createAudioPlayer(assetModule);
+  player.play();
+  return player;
 }
 
 
