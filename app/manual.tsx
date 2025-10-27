@@ -1,5 +1,5 @@
 import FrequencySlider from '@/src/components/FrequencySlider';
-import Button from '@/src/ui/components/Button';
+import Button from '@/src/ui/components/NeonButton';
 import { StyleSheet, Text, View } from 'react-native';
 
 export default function ManualScreen() {

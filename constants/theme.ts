@@ -1,53 +1,80 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Cyberpunk Theme Configuration
+ * Futuristic neon energy theme with glowing UI elements
  */
 
-import { Platform } from 'react-native';
+export const cyberpunkTheme = {
+  // Backgrounds
+  background: '#050509',
+  backgroundDeep: '#000000',
+  backgroundGradient: ['#0a0a14', '#000000'],
+  
+  // Neon Gradients
+  neonPrimary: ['#00FFA3', '#00B2FF'], // Acid green → Electric cyan
+  neonSecondary: ['#FF00E0', '#FF0077'], // Magenta → Hot pink
+  neonAccent: ['#FFD600', '#FF6B00'], // Gold → Orange
+  neonPurple: ['#A78BFA', '#8B5CF6'], // Soft purple → Deep purple
+  
+  // Solid Colors
+  acidGreen: '#00FFA3',
+  electricCyan: '#00B2FF',
+  magenta: '#FF00E0',
+  hotPink: '#FF0077',
+  
+  // Text
+  textPrimary: '#E0E0E0',
+  textSecondary: '#A0A0A0',
+  textDim: '#606060',
+  textNeon: '#00FFA3',
+  
+  // Glow Effects
+  glowPrimary: 'rgba(0, 255, 163, 0.6)',
+  glowSecondary: 'rgba(255, 0, 224, 0.6)',
+  glowSoft: 'rgba(0, 255, 170, 0.3)',
+  
+  // Glass/Blur
+  glassDark: 'rgba(10, 10, 20, 0.7)',
+  glassLight: 'rgba(255, 255, 255, 0.04)',
+  glassBorder: 'rgba(0, 255, 170, 0.2)',
+  
+  // Shadows
+  shadowNeon: {
+    shadowColor: '#00FFA3',
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 12,
+  },
+  shadowMagenta: {
+    shadowColor: '#FF00E0',
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 12,
+  },
+  
+  // Borders
+  borderNeon: 'rgba(0, 255, 170, 0.4)',
+  borderGlow: 'rgba(0, 178, 255, 0.5)',
+  borderDim: 'rgba(255, 255, 255, 0.1)',
+  
+  // Typography
+  fonts: {
+    heading: {
+      fontWeight: '700' as const,
+      letterSpacing: 1.5,
+      textTransform: 'uppercase' as const,
+    },
+    button: {
+      fontWeight: '700' as const,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase' as const,
+    },
+    body: {
+      fontWeight: '400' as const,
+      letterSpacing: 0.5,
+    },
+  },
+} as const;
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
-
-export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
-  },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-  },
-};
-
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
+export type CyberpunkTheme = typeof cyberpunkTheme;

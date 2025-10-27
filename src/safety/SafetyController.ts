@@ -4,7 +4,6 @@
  * Ensures safe operation by checking device state, preventing
  * harmful scenarios, and monitoring runtime conditions.
  */
-
 import { Audio } from 'expo-av';
 import * as Battery from 'expo-battery';
 import * as Device from 'expo-device';
@@ -48,7 +47,7 @@ export interface RuntimeMonitoring {
 
 export class SafetyController {
   private monitoring: RuntimeMonitoring | null = null;
-  private monitoringInterval: NodeJS.Timeout | null = null;
+  private monitoringInterval: ReturnType<typeof setInterval> | null = null;  
 
   /**
    * Perform comprehensive pre-flight safety checks
@@ -203,7 +202,7 @@ export class SafetyController {
     };
 
     // Monitor every 2 seconds
-    this.monitoringInterval = setInterval(() => {
+    this.monitoringInterval = setInterval(() => {  
       this.performRuntimeCheck();
     }, 2000);
   }
@@ -327,18 +326,14 @@ export class SafetyController {
   private async checkAudioMode(): Promise<SafetyCheck> {
     try {
       const audioMode = await Audio.getAudioModeAsync();
-
-      // Check if audio mode is suitable
-      if (Platform.OS === 'ios') {
-        if (!audioMode.playsInSilentModeIOS) {
-          return {
-            passed: false,
-            level: 'warning',
-            code: 'SILENT_MODE_ENABLED',
-            message: 'Silent mode may prevent audio playback',
-            recommendation: 'Disable silent mode',
-          };
-        }
+      if (Platform.OS === 'ios' && !audioMode.playsInSilentModeIOS) {  
+        return {
+          passed: false,
+          level: 'warning',
+          code: 'SILENT_MODE_ENABLED',
+          message: 'Silent mode may prevent audio playback',
+          recommendation: 'Disable silent mode',
+        };
       }
 
       return {
@@ -347,7 +342,7 @@ export class SafetyController {
         code: 'AUDIO_MODE_OK',
         message: 'Audio mode configured correctly',
       };
-    } catch (error) {
+    } catch {
       return {
         passed: true,
         level: 'info',
@@ -370,7 +365,7 @@ export class SafetyController {
         [Device.DeviceType.UNKNOWN]: 'unknown',
       };
       return typeMap[type] || 'unknown';
-    } catch (error) {
+    } catch {
       return 'unknown';
     }
   }
@@ -379,7 +374,7 @@ export class SafetyController {
     try {
       const level = await Battery.getBatteryLevelAsync();
       return level;
-    } catch (error) {
+    } catch {
       return 1.0; // Assume full if can't read
     }
   }
@@ -388,7 +383,7 @@ export class SafetyController {
     try {
       const state = await Battery.getBatteryStateAsync();
       return state === Battery.BatteryState.CHARGING;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -400,34 +395,18 @@ export class SafetyController {
   }
 
   private async getVolumeLevel(): Promise<number> {
-    try {
-      // Note: Expo doesn't provide direct volume reading
-      // This would require native module
-      // For now, return safe default
-      return 0.75;
-    } catch (error) {
-      return 0.75;
-    }
+    // Expo doesn't expose system volume; placeholder default
+    return 0.75;
   }
 
   private async isHeadphonesConnected(): Promise<boolean> {
-    try {
-      // This would require native module for accurate detection
-      // Placeholder: return false
-      return false;
-    } catch (error) {
-      return false;
-    }
+    // Placeholder: would require native module for accurate detection
+    return false;
   }
 
   private async isBluetoothConnected(): Promise<boolean> {
-    try {
-      // This would require native module for accurate detection
-      // Placeholder: return false
-      return false;
-    } catch (error) {
-      return false;
-    }
+    // Placeholder: would require native module for accurate detection
+    return false;
   }
 
   /**
