@@ -6,6 +6,7 @@
  */
 
 import { Platform } from 'react-native';
+import { MicMonitor } from '../../analyzer/MicMonitor';
 import { AudioEngine } from '../audio/AudioEngine';
 import { DustVibration } from './DustVibration';
 import { ResonanceResult, ResonanceScan } from './ResonanceScan';
@@ -32,6 +33,7 @@ export interface AdaptiveConfig {
   performResonanceScan?: boolean;
   learningMode?: boolean;
   maxDuration?: number; // ms
+  enableRealTimeFeedback?: boolean; // Use mic monitoring for real-time adjustment
 }
 
 export interface CleaningResult {
@@ -48,9 +50,19 @@ export class AdaptiveCleaning {
   private waterEjection: WaterEjection;
   private dustVibration: DustVibration;
   private resonanceScan: ResonanceScan;
+  private micMonitor: MicMonitor | null = null;
   
   private deviceProfile: DeviceProfile | null = null;
   private cleaningHistory: CleaningResult[] = [];
+  private realTimeFeedback: { 
+    beforeSnapshot: { rms: number; clarity: number } | null;
+    currentSnapshot: { rms: number; clarity: number } | null;
+    improvementRate: number;
+  } = {
+    beforeSnapshot: null,
+    currentSnapshot: null,
+    improvementRate: 0,
+  };
 
   constructor(audioEngine: AudioEngine) {
     this.audioEngine = audioEngine;
@@ -71,11 +83,17 @@ export class AdaptiveCleaning {
       performResonanceScan = true,
       learningMode = true,
       maxDuration = 30000,
+      enableRealTimeFeedback = true,
     } = config;
 
     const startTime = Date.now();
     const patternsUsed: string[] = [];
     let resonanceData: ResonanceResult | undefined;
+
+    // Initialize real-time feedback monitoring
+    if (enableRealTimeFeedback) {
+      await this.initializeRealTimeFeedback();
+    }
 
     // Step 1: Device profiling
     onProgress?.({ phase: 'Analyzing device...', progress: 0.1 });
@@ -96,6 +114,11 @@ export class AdaptiveCleaning {
       patternsUsed.push('resonance-scan');
     }
 
+    // Step 2.5: Capture baseline for real-time feedback
+    if (enableRealTimeFeedback && this.micMonitor) {
+      await this.captureBaseline();
+    }
+
     // Step 3: Blockage detection
     let blockage: BlockageDetection | null = null;
     if (autoDetectBlockage) {
@@ -109,8 +132,8 @@ export class AdaptiveCleaning {
     const strategy = this.selectStrategy(blockage, resonanceData);
     patternsUsed.push(strategy.name);
 
-    // Step 5: Execute cleaning
-    await this.executeStrategy(strategy, (progress) => {
+    // Step 5: Execute cleaning with real-time feedback
+    await this.executeStrategyWithFeedback(strategy, enableRealTimeFeedback, (progress) => {
       onProgress?.({
         ...progress,
         progress: 0.4 + progress.progress * 0.5,
@@ -122,8 +145,22 @@ export class AdaptiveCleaning {
     const postCleanResonance = await this.resonanceScan.quickScan();
     patternsUsed.push('post-verification');
 
-    // Step 7: Calculate improvement
-    const improvement = this.calculateImprovement(resonanceData, postCleanResonance);
+    // Step 7: Calculate improvement (use real-time feedback if available)
+    let improvement = this.calculateImprovement(resonanceData, postCleanResonance);
+    
+    // Override with real-time feedback if available
+    if (enableRealTimeFeedback && this.realTimeFeedback.beforeSnapshot && this.realTimeFeedback.currentSnapshot) {
+      const rmsImprovement = (this.realTimeFeedback.currentSnapshot.rms - this.realTimeFeedback.beforeSnapshot.rms) / 
+        Math.max(0.01, this.realTimeFeedback.beforeSnapshot.rms);
+      const clarityImprovement = (this.realTimeFeedback.currentSnapshot.clarity - this.realTimeFeedback.beforeSnapshot.clarity) / 
+        Math.max(0.01, this.realTimeFeedback.beforeSnapshot.clarity);
+      improvement = Math.max(0, Math.min(1, (rmsImprovement + clarityImprovement) / 2));
+    }
+
+    // Cleanup real-time feedback
+    if (enableRealTimeFeedback) {
+      await this.cleanupRealTimeFeedback();
+    }
     
     const duration = Date.now() - startTime;
     const result: CleaningResult = {
@@ -342,6 +379,139 @@ export class AdaptiveCleaning {
     onProgress?: (progress: CleaningProgress) => void,
   ): Promise<void> {
     await strategy.execute(onProgress);
+  }
+
+  /**
+   * Execute strategy with real-time feedback adjustment
+   */
+  private async executeStrategyWithFeedback(
+    strategy: { name: string; execute: (onProgress?: (p: CleaningProgress) => void) => Promise<void> },
+    enableFeedback: boolean,
+    onProgress?: (progress: CleaningProgress) => void,
+  ): Promise<void> {
+    if (!enableFeedback || !this.micMonitor) {
+      await this.executeStrategy(strategy, onProgress);
+      return;
+    }
+
+    // Execute with periodic feedback checks
+    let lastFeedbackTime = Date.now();
+    const feedbackInterval = 2000; // Check every 2 seconds
+
+    await strategy.execute(async (progress) => {
+      // Update progress callback
+      onProgress?.(progress);
+
+      // Check real-time feedback periodically
+      const now = Date.now();
+      if (now - lastFeedbackTime >= feedbackInterval) {
+        await this.updateRealTimeFeedback();
+        lastFeedbackTime = now;
+
+        // If improvement rate is negative or plateauing, suggest strategy adjustment
+        if (this.realTimeFeedback.improvementRate < -0.05) {
+          // Consider changing strategy or stopping early
+          // For now, just log - could be enhanced to dynamically adjust
+          console.log('[AdaptiveCleaning] Negative improvement detected, consider adjustment');
+        }
+      }
+    });
+  }
+
+  /**
+   * Initialize real-time feedback monitoring
+   */
+  private async initializeRealTimeFeedback(): Promise<void> {
+    try {
+      this.micMonitor = new MicMonitor();
+      const initialized = await this.micMonitor.initialize();
+      if (initialized) {
+        await this.micMonitor.start(500); // Sample every 500ms
+      } else {
+        console.warn('[AdaptiveCleaning] Mic monitoring not available');
+        this.micMonitor = null;
+      }
+    } catch (error) {
+      console.warn('[AdaptiveCleaning] Failed to initialize real-time feedback:', error);
+      this.micMonitor = null;
+    }
+  }
+
+  /**
+   * Capture baseline metrics before cleaning
+   */
+  private async captureBaseline(): Promise<void> {
+    if (!this.micMonitor) return;
+
+    // Wait a bit for mic to stabilize
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    try {
+      const level = await this.micMonitor.getCurrentLevel();
+      const bandEnergy = await this.micMonitor.getBandEnergy();
+      
+      // Calculate clarity from band energy
+      const totalEnergy = bandEnergy.low + bandEnergy.mid + bandEnergy.high;
+      const clarity = totalEnergy > 0.01 ? Math.min(1, totalEnergy * 10) : 0.3;
+
+      this.realTimeFeedback.beforeSnapshot = {
+        rms: level,
+        clarity,
+      };
+    } catch (error) {
+      console.warn('[AdaptiveCleaning] Failed to capture baseline:', error);
+    }
+  }
+
+  /**
+   * Update real-time feedback during cleaning
+   */
+  private async updateRealTimeFeedback(): Promise<void> {
+    if (!this.micMonitor) return;
+
+    try {
+      const level = await this.micMonitor.getCurrentLevel();
+      const bandEnergy = await this.micMonitor.getBandEnergy();
+      
+      const totalEnergy = bandEnergy.low + bandEnergy.mid + bandEnergy.high;
+      const clarity = totalEnergy > 0.01 ? Math.min(1, totalEnergy * 10) : 0.3;
+
+      this.realTimeFeedback.currentSnapshot = {
+        rms: level,
+        clarity,
+      };
+
+      // Calculate improvement rate
+      if (this.realTimeFeedback.beforeSnapshot) {
+        const rmsChange = (this.realTimeFeedback.currentSnapshot.rms - this.realTimeFeedback.beforeSnapshot.rms) / 
+          Math.max(0.01, this.realTimeFeedback.beforeSnapshot.rms);
+        const clarityChange = (this.realTimeFeedback.currentSnapshot.clarity - this.realTimeFeedback.beforeSnapshot.clarity) / 
+          Math.max(0.01, this.realTimeFeedback.beforeSnapshot.clarity);
+        
+        this.realTimeFeedback.improvementRate = (rmsChange + clarityChange) / 2;
+      }
+    } catch (error) {
+      console.warn('[AdaptiveCleaning] Failed to update feedback:', error);
+    }
+  }
+
+  /**
+   * Cleanup real-time feedback monitoring
+   */
+  private async cleanupRealTimeFeedback(): Promise<void> {
+    if (this.micMonitor) {
+      try {
+        await this.micMonitor.dispose();
+      } catch (error) {
+        console.warn('[AdaptiveCleaning] Failed to cleanup feedback:', error);
+      }
+      this.micMonitor = null;
+    }
+    this.realTimeFeedback = {
+      beforeSnapshot: null,
+      currentSnapshot: null,
+      improvementRate: 0,
+    };
   }
 
   /**

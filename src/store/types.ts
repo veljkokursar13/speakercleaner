@@ -2,7 +2,7 @@
  * Shared types for state management
  */
 
-import { SpeakerHealthReport } from '../diagnostics/SpeakerTest';
+import { SpeakerHealthReport } from '../analyzer/MicAnalyzer';
 import { ResonanceResult } from '../engine/algorithms/ResonanceScan';
 
 export type CleaningStatus = 'idle' | 'preparing' | 'running' | 'paused' | 'complete' | 'error';

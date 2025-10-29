@@ -211,3 +211,141 @@ export async function analyzeMicBuffer(
   return { profile, anomalies, bands: { low: lowN, mid: midN, high: highN } };
 }
 
+// ---- Speaker Health Testing ----
+
+export interface SpeakerHealthReport {
+  overallHealth: 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
+  healthScore: number; // 0-100
+  issues: string[];
+  recommendations: string[];
+  micProfile: MicProfile;
+  timestamp: number;
+}
+
+/**
+ * Assess speaker health from mic profile
+ */
+export function assessSpeakerHealth(
+  micProfile: MicProfile,
+  anomalies: string[]
+): SpeakerHealthReport {
+  const issues: string[] = [];
+  const recommendations: string[] = [];
+
+  // Check each anomaly and provide guidance
+  if (anomalies.includes('HIGH_DISTORTION')) {
+    issues.push('High distortion detected');
+    recommendations.push('Reduce volume or clean speaker membrane');
+  }
+  
+  if (anomalies.includes('HIGH_NOISE_FLOOR')) {
+    issues.push('Elevated background noise');
+    recommendations.push('Test in quieter environment or check mic quality');
+  }
+  
+  if (anomalies.includes('LOW_SIGNAL_LEVEL')) {
+    issues.push('Weak speaker output detected');
+    recommendations.push('Speaker may be blocked - cleaning recommended');
+  }
+  
+  if (anomalies.includes('FREQ_DROPOUT_LOW')) {
+    issues.push('Poor low-frequency response');
+    recommendations.push('Water or heavy debris may be blocking speaker');
+  }
+  
+  if (anomalies.includes('FREQ_DROPOUT_MID')) {
+    issues.push('Reduced mid-frequency clarity');
+    recommendations.push('Dust accumulation likely - try cleaning cycle');
+  }
+  
+  if (anomalies.includes('FREQ_DROPOUT_HIGH')) {
+    issues.push('High-frequency attenuation');
+    recommendations.push('Check speaker grille for obstructions');
+  }
+  
+  if (anomalies.includes('EXCESSIVE_ECHO')) {
+    issues.push('Excessive echo/reverb detected');
+    recommendations.push('Test in different location or check for resonance issues');
+  }
+  
+  if (anomalies.includes('CLIPPING')) {
+    issues.push('Audio clipping detected');
+    recommendations.push('Reduce playback volume to prevent damage');
+  }
+
+  if (anomalies.includes('UNEVEN_RESPONSE')) {
+    issues.push('Uneven frequency response');
+    recommendations.push('Speaker may have physical damage or partial blockage');
+  }
+
+  // Calculate health score (0-100)
+  let score = 100;
+  score -= anomalies.length * 10; // -10 per anomaly
+  score -= micProfile.distortionRiskLevel * 20; // -20 max for distortion
+  score -= Math.max(0, (micProfile.noiseFloorDb + 40) / 2); // Penalty for high noise
+  score -= (1 - micProfile.averageAmplitude) * 30; // -30 max for low amplitude
+  score -= micProfile.clippingEvents * 2; // -2 per clipping event
+  score -= micProfile.echoLevel * 15; // -15 max for echo
+  
+  const healthScore = Math.max(0, Math.min(100, Math.round(score)));
+
+  // Determine overall health category
+  let overallHealth: 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
+  if (healthScore >= 90) {
+    overallHealth = 'excellent';
+  } else if (healthScore >= 75) {
+    overallHealth = 'good';
+  } else if (healthScore >= 60) {
+    overallHealth = 'fair';
+    recommendations.unshift('Speaker cleaning may improve performance');
+  } else if (healthScore >= 40) {
+    overallHealth = 'poor';
+    recommendations.unshift('Speaker cleaning strongly recommended');
+  } else {
+    overallHealth = 'critical';
+    recommendations.unshift('URGENT: Speaker requires immediate attention');
+  }
+
+  return {
+    overallHealth,
+    healthScore,
+    issues,
+    recommendations,
+    micProfile,
+    timestamp: Date.now(),
+  };
+}
+
+/**
+ * Compare two health reports to measure improvement
+ */
+export function compareSpeakerHealth(
+  before: SpeakerHealthReport,
+  after: SpeakerHealthReport
+): {
+  scoreChange: number;
+  improvement: number; // percentage
+  improved: boolean;
+  message: string;
+} {
+  const scoreChange = after.healthScore - before.healthScore;
+  const improvement = (scoreChange / Math.max(1, before.healthScore)) * 100;
+  const improved = scoreChange > 0;
+
+  let message = 'No change';
+  if (scoreChange > 20) {
+    message = 'Significant improvement - speaker health greatly improved!';
+  } else if (scoreChange > 10) {
+    message = 'Notable improvement in speaker performance';
+  } else if (scoreChange > 5) {
+    message = 'Moderate improvement detected';
+  } else if (scoreChange > 0) {
+    message = 'Slight improvement';
+  } else if (scoreChange < -10) {
+    message = 'Speaker health declined - check for damage';
+  } else if (scoreChange < 0) {
+    message = 'Slight decline in performance';
+  }
+
+  return { scoreChange, improvement, improved, message };
+}

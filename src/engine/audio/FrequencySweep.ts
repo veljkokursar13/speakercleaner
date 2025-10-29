@@ -100,6 +100,100 @@ export class FrequencySweep {
   }
 
   /**
+   * Exponential chirp - faster frequency change for aggressive cleaning
+   * More effective for dislodging stuck particles
+   */
+  async playExponentialChirp(
+    fromHz: number,
+    toHz: number,
+    duration: number,
+    cycles = 1,
+    gain = 0.95,
+  ): Promise<void> {
+    for (let i = 0; i < cycles; i++) {
+      await this.audioEngine.playSweep({
+        fromHz,
+        toHz,
+        duration,
+        gain,
+        logarithmic: true, // Exponential/logarithmic sweep
+      });
+
+      if (i < cycles - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50)); // Shorter pause
+      }
+    }
+  }
+
+  /**
+   * Multi-rate chirp - varying speed during sweep
+   * Creates unpredictable pattern for better particle displacement
+   */
+  async playMultiRateChirp(
+    fromHz: number,
+    toHz: number,
+    totalDuration: number,
+    gain = 0.9,
+  ): Promise<void> {
+    const segments = 5;
+    const segmentDuration = totalDuration / segments;
+
+    for (let i = 0; i < segments; i++) {
+      const progress = i / segments;
+      const segmentStart = fromHz + (toHz - fromHz) * progress;
+      const segmentEnd = fromHz + (toHz - fromHz) * ((i + 1) / segments);
+      
+      // Vary speed: slow-fast-slow pattern
+      const speedFactor = i % 2 === 0 ? 0.5 : 2.0; // Alternate slow/fast
+      const actualDuration = segmentDuration * speedFactor;
+
+      await this.audioEngine.playSweep({
+        fromHz: segmentStart,
+        toHz: segmentEnd,
+        duration: actualDuration,
+        gain,
+        logarithmic: false,
+      });
+    }
+  }
+
+  /**
+   * Reverse chirp - sweep down then up
+   * Creates bidirectional membrane movement
+   */
+  async playReverseChirp(
+    fromHz: number,
+    toHz: number,
+    duration: number,
+    cycles = 1,
+    gain = 0.9,
+  ): Promise<void> {
+    for (let i = 0; i < cycles; i++) {
+      // Sweep up
+      await this.audioEngine.playSweep({
+        fromHz,
+        toHz,
+        duration: duration / 2,
+        gain,
+        logarithmic: false,
+      });
+
+      // Sweep down
+      await this.audioEngine.playSweep({
+        fromHz: toHz,
+        toHz: fromHz,
+        duration: duration / 2,
+        gain,
+        logarithmic: false,
+      });
+
+      if (i < cycles - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+  }
+
+  /**
    * Wobble sweep - oscillating amplitude during sweep
    * Creates pulsing effect for enhanced cleaning
    */
