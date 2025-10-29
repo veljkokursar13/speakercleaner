@@ -74,6 +74,101 @@ export class WaveformGenerator {
   }
 
   /**
+   * Enhanced burst pattern - variable timing and gain
+   * More effective for dislodging particles
+   */
+  async playEnhancedBurst(
+    frequency: number,
+    burstDuration: number,
+    burstCount: number,
+    basePauseMs = 100,
+    gainVariation = 0.1,
+  ): Promise<void> {
+    for (let i = 0; i < burstCount; i++) {
+      // Vary gain slightly for each burst
+      const gain = 0.95 + (Math.random() - 0.5) * gainVariation * 2;
+      
+      // Vary pause time slightly (20% variation)
+      const pauseMs = basePauseMs * (0.8 + Math.random() * 0.4);
+
+      await this.audioEngine.playTone({
+        frequency,
+        duration: burstDuration,
+        gain: Math.min(1.0, Math.max(0.8, gain)),
+        waveform: 'square',
+        fadeIn: 0,
+        fadeOut: 0,
+      });
+
+      if (i < burstCount - 1) {
+        await new Promise((resolve) => setTimeout(resolve, pauseMs));
+      }
+    }
+  }
+
+  /**
+   * Cascade burst - increasing frequency bursts
+   * Creates progressive cleaning effect
+   */
+  async playCascadeBurst(
+    baseFrequency: number,
+    burstDuration: number,
+    burstCount: number,
+    frequencyStep: number,
+    pauseMs = 100,
+    gain = 0.95,
+  ): Promise<void> {
+    for (let i = 0; i < burstCount; i++) {
+      const freq = baseFrequency + frequencyStep * i;
+      
+      await this.audioEngine.playTone({
+        frequency: freq,
+        duration: burstDuration,
+        gain,
+        waveform: 'square',
+        fadeIn: 0,
+        fadeOut: 0,
+      });
+
+      if (i < burstCount - 1) {
+        await new Promise((resolve) => setTimeout(resolve, pauseMs));
+      }
+    }
+  }
+
+  /**
+   * Random burst pattern - unpredictable timing and frequency
+   * Prevents speaker adaptation
+   */
+  async playRandomBurst(
+    minFrequency: number,
+    maxFrequency: number,
+    burstDuration: number,
+    burstCount: number,
+    minPauseMs: number,
+    maxPauseMs: number,
+    gain = 0.9,
+  ): Promise<void> {
+    for (let i = 0; i < burstCount; i++) {
+      const freq = minFrequency + Math.random() * (maxFrequency - minFrequency);
+      const pauseMs = minPauseMs + Math.random() * (maxPauseMs - minPauseMs);
+
+      await this.audioEngine.playTone({
+        frequency: freq,
+        duration: burstDuration,
+        gain,
+        waveform: 'square',
+        fadeIn: 0,
+        fadeOut: 0,
+      });
+
+      if (i < burstCount - 1) {
+        await new Promise((resolve) => setTimeout(resolve, pauseMs));
+      }
+    }
+  }
+
+  /**
    * Play harmonics - fundamental + overtones
    * Creates richer sound for broader membrane movement
    */

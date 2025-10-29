@@ -5,8 +5,19 @@
  * mode, intensity, and duration based on detected issues.
  */
 
+import { SpeakerHealthReport } from '../analyzer/MicAnalyzer';
 import { VisualizerMode } from '../components/visualizer/VisualizerManager';
-import { DiagnosticResult, IssueType } from '../diagnostics/DiagnosticOrchestrator';
+
+// Simplified issue type based on speaker health analysis
+export type IssueType = 'water' | 'dust' | 'blockage' | 'damage' | 'none';
+
+export interface DiagnosticResult {
+  health: 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
+  healthScore: number;
+  primaryIssue: IssueType;
+  confidence: number;
+  speakerReport: SpeakerHealthReport;
+}
 
 export interface CleaningRecommendation {
   mode: VisualizerMode;

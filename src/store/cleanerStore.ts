@@ -9,7 +9,7 @@ import { Platform } from 'react-native';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { CalibrationService } from '../diagnostics/CalibrationService';
+import { FrequencyTuner, SessionFeedback } from '../analyzer';
 import { AdaptiveCleaning, CleaningResult } from '../engine/algorithms/AdaptiveCleaning';
 import { DustVibration } from '../engine/algorithms/DustVibration';
 import { CleaningProgress, WaterEjection } from '../engine/algorithms/WaterEjection';
@@ -51,7 +51,7 @@ interface CleanerState {
   // Services (not persisted)
   audioEngine: AudioEngine | null;
   volumeController: VolumeController | null;
-  calibrationService: CalibrationService | null;
+  frequencyTuner: FrequencyTuner | null;
 }
 
 interface CleanerActions {
@@ -138,7 +138,7 @@ export const useCleanerStore = create<CleanerStore>()(
       // Non-persisted services
       audioEngine: null,
       volumeController: null,
-      calibrationService: null,
+      frequencyTuner: null,
 
       // Initialize
       initialize: async () => {
@@ -154,13 +154,12 @@ export const useCleanerStore = create<CleanerStore>()(
           });
           await volumeController.initialize();
           
-          const calibrationService = new CalibrationService();
-          await calibrationService.loadCalibration();
+          const frequencyTuner = new FrequencyTuner();
           
           set({
             audioEngine: engine,
             volumeController,
-            calibrationService,
+            frequencyTuner,
           });
         } catch (error) {
           console.error('[CleanerStore] Initialization failed:', error);
@@ -177,13 +176,13 @@ export const useCleanerStore = create<CleanerStore>()(
         set({
           audioEngine: null,
           volumeController: null,
-          calibrationService: null,
+          frequencyTuner: null,
         });
       },
 
       // Start cleaning
       startCleaning: async (mode, config) => {
-        const { audioEngine, volumeController, calibrationService, settings, sessions, stats } = get();
+        const { audioEngine, volumeController, frequencyTuner, settings, sessions, stats } = get();
         
         if (!audioEngine) {
           throw new Error('Audio engine not initialized');
@@ -277,12 +276,13 @@ export const useCleanerStore = create<CleanerStore>()(
           session.resonanceData = result?.resonanceData;
 
           // Update calibration if learning enabled
-          if (settings.learningModeEnabled && result && calibrationService) {
-            await calibrationService.updateFromResults({
-              cleaningEffectiveness: result.improvement,
-              frequenciesUsed: [calibrationService.getCalibration().resonantFrequency],
+          if (settings.learningModeEnabled && result && frequencyTuner) {
+            const feedback: SessionFeedback = {
+              effectiveness: result.improvement,
+              frequenciesUsed: [frequencyTuner.getCalibration().resonantFrequency],
               gainsUsed: [settings.maxVolume],
-            });
+            };
+            await frequencyTuner.updateFromSession(feedback);
           }
 
           // Save session
