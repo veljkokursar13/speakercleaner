@@ -1,38 +1,30 @@
-import { cyberpunkTheme } from '@/constants/theme';
-import Button from '@/src/ui/components/NeonButton';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Link } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import { QuantumTheme } from '../src/theme/styles';
+import Button from '../src/ui/components/NeonButton';
+import { Subtitle, Title } from '../src/ui/components/Typography';
+
+const { colors } = QuantumTheme;
+const primaryColors = [colors.neonCyan, colors.neonMagenta];
+const secondaryColors = [colors.neonAmber, colors.neonCyan];
+const accentColors = [colors.neonMagenta, colors.neonAmber];
 
 export default function HomeScreen() {
   return (
-    <LinearGradient
-      colors={cyberpunkTheme.backgroundGradient}
-      style={styles.background}
-    >
       <View style={styles.container}>
-        <Text style={styles.title}>QUANTUM CLEANER</Text>
-        <Text style={styles.subtitle}>PURE ENERGY • SPEAKER RESTORATION</Text>
+        <Title style={styles.title}>QUANTUM CLEANER</Title>
+        <Subtitle style={styles.subtitle}>PURE ENERGY • SPEAKER RESTORATION</Subtitle>
         <View style={styles.buttons}>
-          <Link href="/diagnose" asChild>
-            <Button label="Smart Diagnostic" variant="accent" onPress={() => {}} />
-          </Link>
-          <Link href="/auto" asChild>
-            <Button label="Auto Mode" variant="primary" onPress={() => {}} />
-          </Link>
-          <Link href="/manual" asChild>
-            <Button label="Manual Mode" variant="secondary" onPress={() => {}} />
-          </Link>
+          <Button title="Manual Mode" colors={secondaryColors} onPress={() => router.push('/screens/ManualMode')} />
+          <Button title="Auto Mode" colors={primaryColors} onPress={() => router.push('/screens/AutoMode')} />
+          <Button title="Smart Diagnostic" colors={accentColors} onPress={() => router.push('/screens/SmartDiagnosis')} />
         </View>
       </View>
-    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
   container: {
     flex: 1,
     alignItems: 'center',
@@ -41,19 +33,13 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: cyberpunkTheme.textNeon,
     letterSpacing: 2,
-    textShadowColor: cyberpunkTheme.glowSoft,
+    textShadowColor: colors.neonCyan,
     textShadowRadius: 20,
     textShadowOffset: { width: 0, height: 0 },
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: cyberpunkTheme.textSecondary,
     letterSpacing: 1.5,
     marginBottom: 32,
   },
@@ -63,5 +49,3 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
 });
-
-

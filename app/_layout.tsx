@@ -1,22 +1,24 @@
-import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import React from 'react';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-
-
+import { ThemeProvider } from '../src/theme/ThemeProvider';
+import QuantumBackground from './components/QuantumBackround';
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-    <ThemeProvider value={DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false, title: 'PureMic' }} />
-        <Stack.Screen name="diagnose" options={{ headerShown: false, title: 'Diagnostic Scan' }} />
-        <Stack.Screen name="manual" options={{ headerShown: false, title: 'Manual Mode' }} />
-        <Stack.Screen name="auto" options={{ headerShown: false, title: 'Auto Clean' }} />
-      </Stack>
-      <StatusBar style="auto" />
+      <ThemeProvider>
+        <QuantumBackground>
+          <Stack>
+            <Stack.Screen options={{ 
+              headerShown: false,
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              animation: 'slide_from_right',
+            }} />
+          </Stack>
+        </QuantumBackground>
       </ThemeProvider>
     </SafeAreaProvider>
   );

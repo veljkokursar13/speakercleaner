@@ -9,19 +9,20 @@ import { Platform } from 'react-native';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { FrequencyTuner, SessionFeedback } from '../analyzer';
 import { AdaptiveCleaning, CleaningResult } from '../engine/algorithms/AdaptiveCleaning';
 import { DustVibration } from '../engine/algorithms/DustVibration';
 import { CleaningProgress, WaterEjection } from '../engine/algorithms/WaterEjection';
 import { AudioEngine, getGlobalAudioEngine } from '../engine/audio/AudioEngine';
 import { VolumeController } from '../engine/audio/VolumeController';
+import { generateToneBuffer, type ToneBufferResult } from '../hooks/generateToneBuffer';
+import { FrequencyTuner, SessionFeedback } from '../modes/smart/analyzer';
 import {
-    CleaningMode,
-    CleaningSession,
-    CleaningSettings,
-    CleaningStatus,
-    ManualModeState,
-    UserStats,
+  CleaningMode,
+  CleaningSession,
+  CleaningSettings,
+  CleaningStatus,
+  ManualModeState,
+  UserStats,
 } from './types';
 
 interface CleanerState {
@@ -52,6 +53,9 @@ interface CleanerState {
   audioEngine: AudioEngine | null;
   volumeController: VolumeController | null;
   frequencyTuner: FrequencyTuner | null;
+  
+  // Tone buffer cache (not persisted)
+  toneBufferCache: Map<string, ToneBufferResult>;
 }
 
 interface CleanerActions {
@@ -86,6 +90,11 @@ interface CleanerActions {
   
   // Premium
   setPremiumStatus: (isPremium: boolean) => void;
+  
+  // Tone buffer cache
+  generateAndCacheTone: (frequency: number, duration: number, waveform?: ManualModeState['waveform'], amplitude?: number) => Promise<void>;
+  getCachedTone: (frequency: number, duration: number) => ToneBufferResult | null;
+  clearToneCache: () => void;
 }
 
 type CleanerStore = CleanerState & CleanerActions;
@@ -139,6 +148,7 @@ export const useCleanerStore = create<CleanerStore>()(
       audioEngine: null,
       volumeController: null,
       frequencyTuner: null,
+      toneBufferCache: new Map(),
 
       // Initialize
       initialize: async () => {
@@ -182,7 +192,7 @@ export const useCleanerStore = create<CleanerStore>()(
 
       // Start cleaning
       startCleaning: async (mode, config) => {
-        const { audioEngine, volumeController, frequencyTuner, settings, sessions, stats } = get();
+        const { audioEngine, volumeController, frequencyTuner, settings, sessions } = get();
         
         if (!audioEngine) {
           throw new Error('Audio engine not initialized');
@@ -194,6 +204,16 @@ export const useCleanerStore = create<CleanerStore>()(
           if (!safetyCheck.isSafe) {
             throw new Error(safetyCheck.warnings.join('\n'));
           }
+        }
+        if (config && config.frequency && config.frequency < 100) {
+          set((state) => ({
+            manualMode: { ...state.manualMode, frequency: 100 },
+          }));
+        }
+        if (config && config.frequency && config.frequency > 40000) {
+          set((state) => ({
+            manualMode: { ...state.manualMode, frequency: 40000 },
+          }));
         }
 
         // Create session
@@ -234,6 +254,11 @@ export const useCleanerStore = create<CleanerStore>()(
 
           // Execute cleaning based on mode
           switch (mode) {
+            case 'sand': {
+              const dustVibration = new DustVibration(audioEngine);
+              await dustVibration.executeCoarseDust(onProgress);
+              break;
+            }
             case 'adaptive': {
               const adaptive = new AdaptiveCleaning(audioEngine);
               result = await adaptive.execute(
@@ -333,8 +358,10 @@ export const useCleanerStore = create<CleanerStore>()(
 
       // Manual mode: set frequency
       setManualFrequency: (frequency) => {
+        // Clamp frequency to valid range (100-40000)
+        const clampedFrequency = Math.max(100, Math.min(40000, frequency));
         set((state) => ({
-          manualMode: { ...state.manualMode, frequency },
+          manualMode: { ...state.manualMode, frequency: clampedFrequency },
         }));
       },
 
@@ -352,28 +379,81 @@ export const useCleanerStore = create<CleanerStore>()(
         }));
       },
 
-      // Manual mode: play tone
+      // Manual mode: play tone (continuous until stopped)
+      // Integrates: tone buffer caching, volume control, safety checks, and safe gain calculation
       playManualTone: async () => {
-        const { audioEngine, manualMode } = get();
+        const { audioEngine, manualMode, volumeController, generateAndCacheTone, getCachedTone, settings } = get();
+        
         if (!audioEngine) {
           throw new Error('Audio engine not initialized');
         }
 
+        const frequency = manualMode.frequency;
+        const requestedGain = manualMode.gain;
+        const waveform = manualMode.waveform;
+        const duration = manualMode.duration / 1000; // Convert ms to seconds
+
+        // Step 1: Ensure tone buffer is cached (non-blocking, but check if available)
+        const cached = getCachedTone(frequency, duration);
+        if (!cached) {
+          // Generate cache in background (non-blocking)
+          generateAndCacheTone(frequency, duration, waveform, requestedGain).catch((err) => {
+            console.warn('[ManualMode] Failed to cache tone buffer:', err);
+          });
+        } else {
+          console.log('[ManualMode] Using cached tone buffer for', frequency, 'Hz');
+        }
+
+        // Step 2: Perform safety checks if enabled
+        if (settings.safetyChecksEnabled && volumeController) {
+          try {
+            const safetyCheck = await volumeController.performSafetyCheck();
+            
+            if (!safetyCheck.isSafe) {
+              console.warn('[ManualMode] Safety check failed:', safetyCheck.warnings);
+              // Continue but log warnings - user can override
+            }
+            
+            // Log warnings for user awareness
+            if (safetyCheck.warnings.length > 0) {
+              console.info('[ManualMode] Safety warnings:', safetyCheck.warnings);
+            }
+          } catch (error) {
+            console.warn('[ManualMode] Safety check error:', error);
+            // Continue even if safety check fails
+          }
+        }
+
+        // Step 3: Calculate safe gain using VolumeController
+        let safeGain = requestedGain;
+        if (volumeController) {
+          safeGain = volumeController.calculateSafeGain(frequency, requestedGain);
+          
+          if (safeGain !== requestedGain) {
+            console.info(
+              `[ManualMode] Gain adjusted from ${requestedGain.toFixed(2)} to ${safeGain.toFixed(2)} ` +
+              `for safety (frequency: ${frequency}Hz)`
+            );
+          }
+        }
+
+        // Step 4: Update state to playing
         set((state) => ({
           manualMode: { ...state.manualMode, isPlaying: true },
         }));
 
         try {
-          await audioEngine.playTone({
-            frequency: manualMode.frequency,
-            duration: manualMode.duration,
-            gain: manualMode.gain,
-            waveform: manualMode.waveform,
+          // Step 5: Play continuous tone with safe gain
+          await audioEngine.playContinuousTone({
+            frequency,
+            gain: safeGain,
+            waveform,
           });
-        } finally {
+        } catch (error) {
           set((state) => ({
             manualMode: { ...state.manualMode, isPlaying: false },
           }));
+          throw error;
         }
       },
 
@@ -477,6 +557,54 @@ export const useCleanerStore = create<CleanerStore>()(
       setPremiumStatus: (isPremium) => {
         set({ isPremium });
       },
+      
+      // Tone buffer cache: Generate and cache a tone buffer
+      generateAndCacheTone: async (frequency, duration, waveform = 'sine', amplitude = 0.2) => {
+        const cacheKey = `${frequency}-${duration}-${waveform}-${amplitude}`;
+        const { toneBufferCache } = get();
+        
+        // Check cache first
+        if (toneBufferCache.has(cacheKey)) {
+          return;
+        }
+        
+        try {
+          const result = await generateToneBuffer({
+            frequency,
+            duration,
+            amplitude,
+            waveform,
+          }, false); // Don't save to file, just cache in memory
+          
+          set((state) => {
+            const newCache = new Map(state.toneBufferCache);
+            newCache.set(cacheKey, result);
+            return { toneBufferCache: newCache };
+          });
+        } catch (error) {
+          console.error('[CleanerStore] Failed to generate tone buffer:', error);
+        }
+      },
+      
+      // Tone buffer cache: Get cached tone buffer
+      getCachedTone: (frequency, duration) => {
+        const { toneBufferCache } = get();
+        
+        // Try exact match first
+        for (const [key, value] of toneBufferCache.entries()) {
+          const [freq, dur] = key.split('-').map(Number);
+          if (freq === frequency && dur === duration) {
+            return value;
+          }
+        }
+        
+        return null;
+      },
+      
+      // Tone buffer cache: Clear all cached buffers
+      clearToneCache: () => {
+        set({ toneBufferCache: new Map() });
+      },
     }),
     {
       name: 'speaker-cleaner-storage',
@@ -493,6 +621,7 @@ export const useCleanerStore = create<CleanerStore>()(
   ),
 );
 
+//
 // Selectors (for optimized re-renders)
 export const selectStatus = (state: CleanerStore) => state.status;
 export const selectProgress = (state: CleanerStore) => state.progress;

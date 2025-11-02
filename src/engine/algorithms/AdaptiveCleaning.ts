@@ -6,7 +6,7 @@
  */
 
 import { Platform } from 'react-native';
-import { MicMonitor } from '../../analyzer/MicMonitor';
+import { MicMonitor } from '../../modes/smart/analyzer/MicMonitor';
 import { AudioEngine } from '../audio/AudioEngine';
 import { DustVibration } from './DustVibration';
 import { ResonanceResult, ResonanceScan } from './ResonanceScan';

@@ -4,7 +4,6 @@
  * Ensures safe operation by checking device state, preventing
  * harmful scenarios, and monitoring runtime conditions.
  */
-import { Audio } from 'expo-av';
 import * as Battery from 'expo-battery';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
@@ -132,6 +131,8 @@ export class SafetyController {
       checks.push(audioModeCheck);
     }
 
+    // Note: expo-audio doesn't provide getAudioModeAsync() or isOtherAudioPlaying
+    // To check for other audio apps, a native module would be required
     // Categorize checks
     const criticalIssues = checks.filter((c) => !c.passed && c.level === 'critical');
     const warnings = checks.filter((c) => !c.passed && c.level === 'warning');
@@ -322,62 +323,20 @@ export class SafetyController {
 
   /**
    * Check audio mode configuration
+   * Note: expo-audio doesn't expose getAudioModeAsync() to read current audio mode
+   * This check relies on Audio mode being set elsewhere in the app
    */
   private async checkAudioMode(): Promise<SafetyCheck> {
-    try {
-      const audioMode = await Audio.getAudioModeAsync();
-      
-      if (Platform.OS === 'ios') {
-        // Check if silent mode might block audio
-        if (!audioMode.playsInSilentModeIOS) {
-          return {
-            passed: false,
-            level: 'warning',
-            code: 'SILENT_MODE_ENABLED',
-            message: 'Silent mode may prevent audio playback',
-            recommendation: 'Disable silent mode for best results',
-          };
-        }
-
-        // Check if recording is enabled (might interfere)
-        if (!audioMode.allowsRecordingIOS) {
-          return {
-            passed: true,
-            level: 'info',
-            code: 'RECORDING_NOT_ENABLED',
-            message: 'Microphone recording not enabled',
-            recommendation: 'Enable microphone access for real-time feedback',
-          };
-        }
-      }
-
-      // Check Android audio mode
-      if (Platform.OS === 'android') {
-        // expo-av Android audio mode checking is limited
-        // Would need native module for full AudioManager access
-        return {
-          passed: true,
-          level: 'info',
-          code: 'AUDIO_MODE_OK',
-          message: 'Audio mode configured correctly',
-        };
-      }
-
-      return {
-        passed: true,
-        level: 'info',
-        code: 'AUDIO_MODE_OK',
-        message: 'Audio mode configured correctly',
-      };
-    } catch (error) {
-      return {
-        passed: true,
-        level: 'info',
-        code: 'AUDIO_MODE_CHECK_FAILED',
-        message: 'Could not verify audio mode',
-        recommendation: 'Proceed with caution',
-      };
-    }
+    // expo-audio limitation: getAudioModeAsync() doesn't exist
+    // Audio mode should be set by the app before cleaning starts
+    // This is just an informational check
+    return {
+      passed: true,
+      level: 'info',
+      code: 'AUDIO_MODE_CHECK_SKIPPED',
+      message: 'Audio mode check requires native module',
+      recommendation: 'Ensure audio mode is configured before cleaning',
+    };
   }
 
   // ==================== Device Info Helpers ====================
@@ -417,73 +376,34 @@ export class SafetyController {
   }
 
   private async getThermalState(): Promise<DeviceState['thermalState']> {
-    try {
-      // expo-device doesn't expose thermal state directly
-      // In production, this would require a native module
-      // For now, return nominal as a safe default
-      // TODO: Implement native thermal monitoring module
-      return 'nominal';
-    } catch {
-      return 'nominal';
-    }
+    // expo-device doesn't expose thermal state directly
+    // In production, this would require a native module
+    // For now, return nominal as a safe default
+    // TODO: Implement native thermal monitoring module
+    return 'nominal';
   }
 
   private async getVolumeLevel(): Promise<number> {
-    try {
-      // Expo doesn't expose system volume directly
-      // Try to infer from audio session (iOS) or use default
-      if (Platform.OS === 'ios') {
-        const audioMode = await Audio.getAudioModeAsync();
-        // iOS doesn't expose volume, but we can check if it's reasonable
-        // Default to 0.75 (75%) as safe assumption
-        return 0.75;
-      }
-      
-      // Android: try to get volume hint if available
-      // Default to 0.75 as safe assumption
-      return 0.75;
-    } catch {
-      return 0.75; // Safe default
-    }
+    // Expo doesn't expose system volume directly
+    // expo-audio doesn't have APIs to read current settings
+    // Default to 0.75 (75%) as safe assumption
+    // In production, this would require a native module
+    return 0.75;
   }
 
   private async isHeadphonesConnected(): Promise<boolean> {
-    try {
-      if (Platform.OS === 'ios') {
-        // Check audio session routing
-        const audioMode = await Audio.getAudioModeAsync();
-        // Note: expo-av doesn't expose currentRoute, but we can infer
-        // If headphones are connected, audio would route differently
-        // For now, this is a limitation - native module needed for accuracy
-        return false; // Conservative: assume not connected unless we can prove otherwise
-      }
-      
-      // Android: would need native module to check AudioManager
-      // For now, return false as safe default
-      return false;
-    } catch {
-      return false; // Safe default: assume not connected
-    }
+    // expo-audio doesn't expose audio routing information
+    // Native module required for accurate headphone detection
+    // Conservative: assume not connected unless proven otherwise
+    return false;
   }
 
   private async isBluetoothConnected(): Promise<boolean> {
-    try {
-      // Both iOS and Android require native modules for accurate Bluetooth detection
-      // Check audio routing to infer Bluetooth connection
-      // This is a best-effort approach
-      
-      if (Platform.OS === 'ios') {
-        const audioMode = await Audio.getAudioModeAsync();
-        // expo-av limitation: can't directly check route
-        // Would need native module or react-native-bluetooth-scanner
-        return false; // Conservative: assume not connected
-      }
-      
-      // Android: would need native AudioManager check
-      return false; // Safe default
-    } catch {
-      return false; // Safe default
-    }
+    // Both iOS and Android require native modules for accurate Bluetooth detection
+    // expo-audio doesn't expose audio routing information
+    // Would need native module or react-native-bluetooth-scanner
+    // Conservative: assume not connected
+    return false;
   }
 
   /**

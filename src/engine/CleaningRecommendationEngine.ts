@@ -1,12 +1,5 @@
-/**
- * CleaningRecommendationEngine - AI-powered cleaning mode selection
- * 
- * Analyzes diagnostic results and recommends optimal cleaning
- * mode, intensity, and duration based on detected issues.
- */
-
-import { SpeakerHealthReport } from '../analyzer/MicAnalyzer';
 import { VisualizerMode } from '../components/visualizer/VisualizerManager';
+import { SpeakerHealthReport } from '../modes/smart/analyzer/MicAnalyzer';
 
 // Simplified issue type based on speaker health analysis
 export type IssueType = 'water' | 'dust' | 'blockage' | 'damage' | 'none';

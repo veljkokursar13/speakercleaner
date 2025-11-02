@@ -1,40 +1,35 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useCleanerStore, selectProgress, selectStatus } from '../store/cleanerStore';
+import type { CleaningMode } from '../store/types';
 
-type Status = 'idle' | 'running' | 'stopped';
+type StartArg = CleaningMode | 'sand';
 
+/**
+ * Convenience hook for cleaning operations
+ * Wraps cleanerStore actions with automatic initialization
+ */
 export function useCleaner() {
-  const [status, setStatus] = useState<Status>('idle');
-  const [progress, setProgress] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const status = useCleanerStore(selectStatus);
+  const progress = useCleanerStore(selectProgress);
+  const initialize = useCleanerStore((s) => s.initialize);
+  const startCleaning = useCleanerStore((s) => s.startCleaning);
+  const stopCleaning = useCleanerStore((s) => s.stopCleaning);
+  const audioEngine = useCleanerStore((s) => s.audioEngine);
 
-  const start = useCallback(() => {
-    if (timerRef.current) return;
-    setStatus('running');
-    setProgress(0);
-    let t = 0;
-    timerRef.current = setInterval(() => {
-      t += 0.02;
-      setProgress((p) => {
-        const next = Math.min(1, p + 0.02);
-        if (next >= 1 && timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-          setStatus('idle');
-        }
-        return next;
-      });
-    }, 200);
-  }, []);
+  const start = useCallback(
+    async (mode: StartArg = 'auto') => {
+      if (!audioEngine) {
+        await initialize();
+      }
+      await startCleaning(mode as CleaningMode);
+    },
+    [audioEngine, initialize, startCleaning],
+  );
 
   const stop = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    setStatus('stopped');
-  }, []);
+    stopCleaning();
+  }, [stopCleaning]);
 
   return useMemo(() => ({ status, progress, start, stop }), [status, progress, start, stop]);
 }
-
 

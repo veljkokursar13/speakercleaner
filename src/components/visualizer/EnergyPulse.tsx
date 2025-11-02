@@ -1,6 +1,7 @@
-import { useAudioVisualizer } from '@/src/hooks/useAudioVisualizer';
-import { BlurMask, Canvas, Circle, Group, LinearGradient, Paint, useClockValue, useComputedValue, vec } from '@shopify/react-native-skia';
+import { BlurMask, Canvas, Circle, Group, LinearGradient, Paint, vec } from '@shopify/react-native-skia';
 import React from 'react';
+import { useDerivedValue, useSharedValue } from 'react-native-reanimated';
+import { useAudioVisualizer } from '../../hooks/useAudioVisualizer';
 
 type Props = {
   isActive?: boolean;
@@ -23,7 +24,7 @@ export default function EnergyPulse({
   colors = ['#00FFA3', '#FFD600'], // Acid green to gold
   speed = 2.5,
 }: Props) {
-  const clock = useClockValue();
+  const clock = useSharedValue(0);
   const { frequencyData } = useAudioVisualizer(isActive);
   const amplitude = frequencyData.length > 0 
     ? frequencyData.reduce((a, b) => a + b) / frequencyData.length 
@@ -31,8 +32,24 @@ export default function EnergyPulse({
   const cx = width / 2;
   const cy = height / 2;
 
-  const rings = useComputedValue(() => {
-    const t = (clock.current ?? 0) / 1000;
+  // Animate clock when active
+  React.useEffect(() => {
+    if (!isActive) {
+      clock.value = 0;
+      return;
+    }
+
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      clock.value = elapsed;
+    }, 16); // ~60fps
+
+    return () => clearInterval(interval);
+  }, [isActive, clock]);
+
+  const rings = useDerivedValue(() => {
+    const t = (clock.value ?? 0) / 1000;
     const base = 18 + amplitude * 28; // base inner radius
     const gap = 12 + amplitude * 10; // distance between rings
     const pulse = 6 + amplitude * 10; // pulsation amplitude
@@ -47,7 +64,7 @@ export default function EnergyPulse({
     return arr;
   }, [clock, amplitude, ringCount, speed]);
 
-  const ringData = rings.current as Ring[];
+  const ringData = rings.value as Ring[];
 
   return (
     <Canvas style={{ width, height }}>

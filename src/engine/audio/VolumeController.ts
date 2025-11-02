@@ -3,9 +3,11 @@
  * 
  * Prevents clipping, manages dynamic range, and ensures
  * safe listening levels across devices.
+ * 
+ * Note: System volume cannot be read directly on iOS/Android.
+ * This controller manages app-level gain instead.
  */
 
-import * as Audio from 'expo-av';
 import { Platform } from 'react-native';
 
 export interface VolumeConfig {
@@ -37,14 +39,21 @@ export class VolumeController {
 
   /**
    * Initialize and get current system volume
+   * Note: System volume cannot be read directly on iOS/Android.
+   * Returns safe default and manages app-level gain instead.
    */
   async initialize(): Promise<void> {
     try {
-      // Get current system volume
-      const audioMode = await Audio.getAudioModeAsync();
-      this.systemVolume = 1.0; // Default, actual value may vary by platform
+      // System volume cannot be read directly on iOS/Android due to platform restrictions
+      // Use a safe default value (75% is recommended for speaker cleaning)
+      this.systemVolume = 0.75;
+      
+      // Log that we're using app-level gain control
+      console.log('[VolumeController] Initialized with app-level gain control. System volume cannot be read directly.');
     } catch (error) {
-      console.warn('[VolumeController] Could not read system volume:', error);
+      console.warn('[VolumeController] Initialization warning:', error);
+      // Use safe default even on error
+      this.systemVolume = 0.75;
     }
   }
 
@@ -62,19 +71,12 @@ export class VolumeController {
       isSafe = false;
     }
 
-    // Check system volume
-    const currentVolume = this.systemVolume;
-    if (currentVolume < 0.5) {
-      warnings.push('System volume is low - cleaning may be ineffective');
-    } else if (currentVolume > 0.9) {
-      warnings.push('System volume is very high - reduce to 70-80% for safety');
-    }
+    // Note: System volume cannot be read directly, so we use app-level gain
+    // Warn user to check their system volume manually
+    warnings.push('Ensure system volume is set to 70-80% for effective cleaning');
+    warnings.push('Reduce system volume if it exceeds 80% to prevent speaker damage');
 
-    // Check audio mode
-    const audioMode = await Audio.getAudioModeAsync();
-    if (audioMode.allowsRecordingIOS || audioMode.playsInSilentModeIOS === false) {
-      warnings.push('Audio mode may prevent speaker cleaning - check settings');
-    }
+    const currentVolume = this.systemVolume; // This is our app-level gain estimate
 
     return {
       isHeadphonesConnected,
