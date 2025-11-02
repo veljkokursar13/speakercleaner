@@ -7,7 +7,7 @@ import { ResonanceResult } from '../engine/algorithms/ResonanceScan';
 
 export type CleaningStatus = 'idle' | 'preparing' | 'running' | 'paused' | 'complete' | 'error';
 
-export type CleaningMode = 'auto' | 'manual' | 'adaptive' | 'water' | 'dust';
+export type CleaningMode = 'auto' | 'manual' | 'adaptive' | 'water' | 'dust' | 'sand';
 
 export interface CleaningSession {
   id: string;

@@ -1,8 +1,9 @@
 // QuantumField visualizer (placeholder implementation)
 // Uses Skia to render softly glowing particles with gentle motion
-import { useAudioVisualizer } from '@/src/hooks/useAudioVisualizer';
-import { BlurMask, Canvas, Circle, Group, LinearGradient, Paint, useClockValue, useComputedValue, vec } from '@shopify/react-native-skia';
+import { BlurMask, Canvas, Circle, Group, LinearGradient, Paint, vec } from '@shopify/react-native-skia';
 import React, { useMemo } from 'react';
+import { useDerivedValue, useSharedValue } from 'react-native-reanimated';
+import { useAudioVisualizer } from '../../hooks/useAudioVisualizer';
 
 type Props = {
   isActive?: boolean;
@@ -30,11 +31,27 @@ export default function QuantumField({
   particleCount = 48,
   colors = ['#FF00E0', '#00B2FF'], // Magenta to electric cyan
 }: Props) {
-  const clock = useClockValue();
+  const clock = useSharedValue(0);
   const { frequencyData } = useAudioVisualizer(isActive);
   const amplitude = frequencyData.length > 0 
     ? frequencyData.reduce((a, b) => a + b) / frequencyData.length 
     : 0;
+
+  // Animate clock when active
+  React.useEffect(() => {
+    if (!isActive) {
+      clock.value = 0;
+      return;
+    }
+
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      clock.value = elapsed;
+    }, 16); // ~60fps
+
+    return () => clearInterval(interval);
+  }, [isActive, clock]);
 
   const particles: Particle[] = useMemo(
     () =>
@@ -49,8 +66,8 @@ export default function QuantumField({
     [particleCount, width, height]
   );
 
-  const animated = useComputedValue(() => {
-    const t = (clock.current ?? 0) / 1000;
+  const animated = useDerivedValue(() => {
+    const t = (clock.value ?? 0) / 1000;
     const amp = 8 + amplitude * 22; // motion radius in px
     return particles.map((p) => ({
       x: p.x0 + Math.cos(p.angle + t * p.speed) * (amp + p.drift),
@@ -59,7 +76,7 @@ export default function QuantumField({
     }));
   }, [clock, particles, amplitude]);
 
-  const animatedParticles = animated.current as AnimatedParticle[];
+  const animatedParticles = animated.value as AnimatedParticle[];
 
   return (
     <Canvas style={{ width, height }}>

@@ -1,19 +1,24 @@
-// Mock expo-av
-jest.mock('expo-av', () => ({
-  Audio: {
-    Recording: jest.fn(),
-    requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
-    setAudioModeAsync: jest.fn(() => Promise.resolve()),
-    getAudioModeAsync: jest.fn(() => Promise.resolve({
-      allowsRecordingIOS: false,
-      playsInSilentModeIOS: true,
-    })),
-    RecordingOptionsPresets: {
-      HIGH_QUALITY: {},
-    },
-    AndroidOutputFormat: {},
-    AndroidAudioEncoder: {},
-    IOSAudioQuality: {},
+// Mock expo-audio
+jest.mock('expo-audio', () => ({
+  useAudioPlayer: jest.fn(() => ({
+    play: jest.fn(),
+    pause: jest.fn(),
+    stop: jest.fn(),
+    seek: jest.fn(),
+    volume: 1,
+    duration: 0,
+    currentTime: 0,
+    isPlaying: false,
+  })),
+}));
+
+// Mock react-native-audio-record
+jest.mock('react-native-audio-record', () => ({
+  default: {
+    init: jest.fn(),
+    start: jest.fn(),
+    stop: jest.fn(() => Promise.resolve()),
+    addRecordingEventListener: jest.fn(),
   },
 }));
 

@@ -1,6 +1,6 @@
-import { cyberpunkTheme } from '@/constants/theme';
 import React, { ReactNode } from 'react';
 import { StyleSheet, View, ViewStyle } from 'react-native';
+import { cyberpunkTheme } from '../../../constants/theme';
 
 type Props = {
   children: ReactNode;

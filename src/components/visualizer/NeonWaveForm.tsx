@@ -1,6 +1,7 @@
-import { useAudioVisualizer } from '@/src/hooks/useAudioVisualizer';
-import { BlurMask, Canvas, LinearGradient, Paint, Path, Skia, useClockValue, useComputedValue, vec } from '@shopify/react-native-skia';
+import { BlurMask, Canvas, LinearGradient, Paint, Path, Skia, vec } from '@shopify/react-native-skia';
 import React from 'react';
+import { useDerivedValue, useSharedValue } from 'react-native-reanimated';
+import { useAudioVisualizer } from '../../hooks/useAudioVisualizer';
 
 type Props = {
   isActive?: boolean;
@@ -19,18 +20,34 @@ export default function NeonWaveForm({
   strokeWidth = 3,
   colors = ['#00FFA3', '#00B2FF', '#A78BFA'], // Cyberpunk neon colors
 }: Props) {
-  const clock = useClockValue();
+  const clock = useSharedValue(0);
   const { frequencyData } = useAudioVisualizer(isActive);
   const amplitude = frequencyData.length > 0 
     ? frequencyData.reduce((a, b) => a + b) / frequencyData.length 
     : 0;
 
-  const path = useComputedValue(() => {
+  // Animate clock when active
+  React.useEffect(() => {
+    if (!isActive) {
+      clock.value = 0;
+      return;
+    }
+
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      clock.value = elapsed;
+    }, 16); // ~60fps
+
+    return () => clearInterval(interval);
+  }, [isActive, clock]);
+
+  const path = useDerivedValue(() => {
     const p = Skia.Path.Make();
 
     const ampPx = Math.max(4, Math.min(1, amplitude) * (height / 2 - 8));
     const step = 4; // px per sample
-    const t = (clock.current ?? 0) / 1000; // seconds
+    const t = (clock.value ?? 0) / 1000; // seconds
     const speed = 2.0; // radians/sec
 
     p.moveTo(0, height / 2);

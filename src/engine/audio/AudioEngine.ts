@@ -6,8 +6,14 @@
  */
 
 import { NativeModules, Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 const { ExpoAudioEngineModule } = NativeModules;
+
+// Detect if running in Expo Go (native module won't be available)
+// Check both module existence and execution environment
+const isExpoGo = !ExpoAudioEngineModule || 
+  (Constants.executionEnvironment === 'storeClient');
 
 export type WaveformType = 'sine' | 'square' | 'triangle' | 'sawtooth' | 'noise';
 
@@ -35,10 +41,16 @@ export interface SweepParameters {
   waveform?: WaveformType;
 }
 
+export interface ContinuousToneParameters {
+  frequency: number; // Hz
+  gain: number; // 0.0 - 1.0
+  waveform?: WaveformType;
+}
+
 export interface MultiToneParameters {
-  frequencies: number[]; // Array of Hz values
+  frequencies: number[]; // Hz array
   duration: number; // ms
-  gains?: number[]; // Individual gains, or uniform if not provided
+  gains?: number[]; // Optional gain per frequency (defaults to equal distribution)
   waveform?: WaveformType;
 }
 
@@ -63,6 +75,12 @@ export class AudioEngine {
     if (this.isInitialized) return;
 
     try {
+      if (isExpoGo) {
+        console.log('[AudioEngine] Running in Expo Go - using console.log fallback');
+        this.isInitialized = true;
+        return;
+      }
+
       if (Platform.OS === 'ios' || Platform.OS === 'android') {
         await ExpoAudioEngineModule?.initialize(this.config);
       } else {
@@ -72,6 +90,11 @@ export class AudioEngine {
       this.isInitialized = true;
     } catch (error) {
       console.error('[AudioEngine] Initialization failed:', error);
+      // In Expo Go, just mark as initialized anyway
+      if (isExpoGo) {
+        this.isInitialized = true;
+        return;
+      }
       throw new Error('Failed to initialize audio engine');
     }
   }
@@ -83,6 +106,15 @@ export class AudioEngine {
     this.ensureInitialized();
     
     const normalized = this.normalizeToneParams(params);
+    
+    if (isExpoGo) {
+      console.log(`[AudioEngine] 🔊 Playing tone: ${normalized.frequency}Hz, ${normalized.duration}ms, ${normalized.waveform}, gain: ${normalized.gain}`);
+      this.isPlaying = true;
+      // Simulate duration
+      await new Promise(resolve => setTimeout(resolve, normalized.duration));
+      this.isPlaying = false;
+      return;
+    }
     
     try {
       this.isPlaying = true;
@@ -108,6 +140,14 @@ export class AudioEngine {
       waveform: params.waveform ?? 'sine',
     };
 
+    if (isExpoGo) {
+      console.log(`[AudioEngine] 🔊 Playing sweep: ${normalized.fromHz}Hz → ${normalized.toHz}Hz, ${normalized.duration}ms, ${normalized.waveform}`);
+      this.isPlaying = true;
+      await new Promise(resolve => setTimeout(resolve, normalized.duration));
+      this.isPlaying = false;
+      return;
+    }
+
     try {
       this.isPlaying = true;
       if (Platform.OS === 'ios' || Platform.OS === 'android') {
@@ -132,6 +172,14 @@ export class AudioEngine {
       waveform: params.waveform ?? 'sine',
     };
 
+    if (isExpoGo) {
+      console.log(`[AudioEngine] 🔊 Playing multi-tone: ${normalized.frequencies.join(', ')}Hz, ${normalized.duration}ms`);
+      this.isPlaying = true;
+      await new Promise(resolve => setTimeout(resolve, normalized.duration));
+      this.isPlaying = false;
+      return;
+    }
+
     try {
       this.isPlaying = true;
       if (Platform.OS === 'ios' || Platform.OS === 'android') {
@@ -145,10 +193,63 @@ export class AudioEngine {
   }
 
   /**
+   * Play a continuous tone until stop() is called
+   * Useful for manual mode where user controls playback
+   */
+  async playContinuousTone(params: ContinuousToneParameters): Promise<void> {
+    this.ensureInitialized();
+    
+    const normalized = {
+      frequency: Math.max(20, Math.min(20000, params.frequency)),
+      gain: Math.max(0, Math.min(1, params.gain)),
+      waveform: params.waveform ?? 'sine',
+    };
+
+    if (isExpoGo) {
+      console.log(`[AudioEngine] 🔊 Playing continuous tone: ${normalized.frequency}Hz, ${normalized.waveform}, gain: ${normalized.gain}`);
+      this.isPlaying = true;
+      // Don't auto-stop - wait for stop() call
+      return;
+    }
+
+    try {
+      this.isPlaying = true;
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        // For native, use a very long duration (1 hour) to simulate continuous
+        // Don't await - let it play in background and stop() will interrupt it
+        ExpoAudioEngineModule?.playTone({
+          frequency: normalized.frequency,
+          duration: 3600000, // 1 hour - will be stopped by stop() call
+          gain: normalized.gain,
+          waveform: normalized.waveform,
+          fadeIn: 10,
+          fadeOut: 0, // No fade out for continuous
+        }).catch(() => {
+          // If interrupted, that's fine - stop() was called
+          this.isPlaying = false;
+        });
+        // Return immediately - don't wait for completion
+        return;
+      } else {
+        await this.playContinuousToneWeb(normalized);
+      }
+    } catch (error) {
+      this.isPlaying = false;
+      throw error;
+    }
+  }
+
+  /**
    * Stop current playback
    */
   async stop(): Promise<void> {
-    if (!this.isPlaying) return;
+    if (!this.isPlaying && !this.continuousOscillator) return;
+
+    if (isExpoGo) {
+      console.log('[AudioEngine] ⏹️ Stopping audio playback');
+      this.isPlaying = false;
+      return;
+    }
 
     try {
       if (Platform.OS === 'ios' || Platform.OS === 'android') {
@@ -167,6 +268,12 @@ export class AudioEngine {
   async dispose(): Promise<void> {
     await this.stop();
     
+    if (isExpoGo) {
+      console.log('[AudioEngine] 🗑️ Disposing audio engine');
+      this.isInitialized = false;
+      return;
+    }
+
     if (Platform.OS === 'ios' || Platform.OS === 'android') {
       await ExpoAudioEngineModule?.dispose();
     } else {
@@ -206,6 +313,7 @@ export class AudioEngine {
   
   private audioContext?: AudioContext;
   private currentSource?: AudioBufferSourceNode;
+  private continuousOscillator?: OscillatorNode;
   private gainNode?: GainNode;
 
   private async initializeWebAudio(): Promise<void> {
@@ -326,13 +434,61 @@ export class AudioEngine {
     }
   }
 
+  private async playContinuousToneWeb(params: Required<ContinuousToneParameters>): Promise<void> {
+    if (!this.audioContext || !this.gainNode) return;
+
+    // Stop any existing continuous tone
+    if (this.continuousOscillator) {
+      this.stopWeb();
+    }
+
+    // Create oscillator for continuous playback
+    this.continuousOscillator = this.audioContext.createOscillator();
+    this.continuousOscillator.type = this.mapWaveformToOscillatorType(params.waveform);
+    this.continuousOscillator.frequency.value = params.frequency;
+    
+    // Set gain
+    this.gainNode.gain.value = params.gain;
+    
+    // Connect and start
+    this.continuousOscillator.connect(this.gainNode);
+    this.continuousOscillator.start();
+  }
+
+  private mapWaveformToOscillatorType(waveform: WaveformType): OscillatorType {
+    switch (waveform) {
+      case 'sine':
+        return 'sine';
+      case 'square':
+        return 'square';
+      case 'triangle':
+        return 'triangle';
+      case 'sawtooth':
+        return 'sawtooth';
+      default:
+        return 'sine';
+    }
+  }
+
   private stopWeb(): void {
+    // Stop continuous oscillator if playing
+    if (this.continuousOscillator) {
+      try {
+        this.continuousOscillator.stop();
+        this.continuousOscillator.disconnect();
+      } catch (error) {
+        console.error('[AudioEngine] Error stopping continuous oscillator:', error);
+      }
+      this.continuousOscillator = undefined;
+    }
+
+    // Stop buffer source if playing
     if (this.currentSource) {
       try {
         this.currentSource.stop();
         this.currentSource.disconnect();
-      } catch (e) {
-        // Ignore if already stopped
+      } catch (error) {
+        console.error('[AudioEngine] Error stopping playback:', error);
       }
       this.currentSource = undefined;
     }
